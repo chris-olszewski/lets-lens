@@ -125,8 +125,7 @@ modify ::
   -> (a -> b)
   -> s
   -> t
-modify =
-  error "todo: modify"
+modify (Lens r) f = getIdentity . r (Identity . f)
 
 -- | An alias for @modify@.
 (%~) ::
@@ -155,8 +154,7 @@ infixr 4 %~
   -> b
   -> s
   -> t
-(.~) =
-  error "todo: (.~)"
+(.~) l c = modify l (const c)
 
 infixl 5 .~
 
@@ -176,8 +174,7 @@ fmodify ::
   -> (a -> f b)
   -> s
   -> f t 
-fmodify =
-  error "todo: fmodify"
+fmodify (Lens r) = r
 
 -- |
 --
@@ -192,8 +189,7 @@ fmodify =
   -> f b
   -> s
   -> f t
-(|=) =
-  error "todo: (|=)"
+(|=) l b = fmodify l (const b)
 
 infixl 5 |=
 
@@ -209,8 +205,10 @@ infixl 5 |=
 -- prop> let types = (x :: Int, y :: String) in setsetLaw fstL (x, y) z
 fstL ::
   Lens (a, x) (b, x) a b
-fstL =
-  error "todo: fstL"
+fstL = Lens r
+  where r f (a, x) = fmap (\l -> (l, x)) (f a)
+  -- f a :: f b
+  -- fmap :: (b -> t) -> f b -> f t
 
 -- |
 --
@@ -224,8 +222,8 @@ fstL =
 -- prop> let types = (x :: Int, y :: String) in setsetLaw sndL (x, y) z
 sndL ::
   Lens (x, a) (x, b) a b
-sndL =
-  error "todo: sndL"
+sndL = Lens r
+  where r f (x, a) = fmap ((,) x) (f a)
 
 -- |
 --
@@ -238,20 +236,23 @@ sndL =
 -- >>> set (mapL 3) (Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) (Just 'X')
 -- fromList [(1,'a'),(2,'b'),(3,'X'),(4,'d')]
 --
--- >>> set (mapL 33) (Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) (Just 'X')
+-- >>> set (mapL 33) (Data.Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) (Just 'X')
 -- fromList [(1,'a'),(2,'b'),(3,'c'),(4,'d'),(33,'X')]
 --
--- >>> set (mapL 3) (Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) Nothing
+-- >>> set (mapL 3) (Data.Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) Nothing
 -- fromList [(1,'a'),(2,'b'),(4,'d')]
 --
--- >>> set (mapL 33) (Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) Nothing
+-- >>> set (mapL 33) (Data.Map.fromList (map (\c -> (ord c - 96, c)) ['a'..'d'])) Nothing
 -- fromList [(1,'a'),(2,'b'),(3,'c'),(4,'d')]
 mapL ::
   Ord k =>
   k
   -> Lens (Map k v) (Map k v) (Maybe v) (Maybe v)
-mapL =
-  error "todo: mapL"
+mapL k = Lens r
+  where r f m = fmap (g m) (f $ Map.lookup k m)
+        g m Nothing = Map.delete k m
+        g m (Just x) = Map.insert k x m
+
 
 -- |
 --
@@ -264,20 +265,22 @@ mapL =
 -- >>> set (setL 3) (Set.fromList [1..5]) True
 -- fromList [1,2,3,4,5]
 --
--- >>> set (setL 3) (Set.fromList [1..5]) False
+-- >>> set (setL 3) (Data.Set.fromList [1..5]) False
 -- fromList [1,2,4,5]
 --
--- >>> set (setL 33) (Set.fromList [1..5]) True
+-- >>> set (setL 33) (Data.Set.fromList [1..5]) True
 -- fromList [1,2,3,4,5,33]
 --
--- >>> set (setL 33) (Set.fromList [1..5]) False
+-- >>> set (setL 33) (Data.Set.fromList [1..5]) False
 -- fromList [1,2,3,4,5]
 setL ::
   Ord k =>
   k
   -> Lens (Set k) (Set k) Bool Bool
-setL =
-  error "todo: setL"
+setL k = Lens r
+  where r f s = fmap (g s) (f $ Set.member k s)
+        g s True = Set.insert k s
+        g s False = Set.delete k s
 
 -- |
 --
@@ -290,8 +293,12 @@ compose ::
   Lens s t a b
   -> Lens q r s t
   -> Lens q r a b
-compose =
-  error "todo: compose"
+compose (Lens l) (Lens r) = Lens c
+  where c f = r (l f)
+  -- feels like i should be able to do point free
+  -- l :: (a -> f b) -> s -> f t
+  -- r :: (s -> f t) -> q -> f r
+  -- c :: (a -> f b) -> q -> f r
 
 -- | An alias for @compose@.
 (|.) ::
